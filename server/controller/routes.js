@@ -3,9 +3,36 @@ var path = require('path');
 var bcrypt = require('bcryptjs');
 
 var router = express.Router();
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
 
 var models = require('./../models');
-models.sequelize.sync();
+
+passport.serializeUser(function(user,done){
+	done(null, user);
+});
+
+passport.deserializeUser(function(obj,done){
+	done(null, obj);
+});
+
+passport.use('local-signin', new LocalStrategy({
+	usernameField: 'username',
+	passwordField: 'password',
+	passReqToCallback: true
+},
+function(req, username, password, done){
+	process.nextTick(function(){
+		models.User.findOne({where: {username: username}}).then(function(user){
+			if(!user)
+				return done(null, false, {message: 'no user'});
+	        if (!bcrypt.compareSync(password, user.get('password_hash'))) {
+	          return done(null, false, {message: 'incorrect password'});
+	        }
+			return done(null, user);
+		});
+	});
+}));
 
 router.get('/', function(req,res){
 	res.sendFile(path.join(__dirname, '../../client/public/index.html'));
@@ -26,18 +53,13 @@ router.post('/api/register' , (req, res) => {
 	});
 });
 
-// router.post('/', (req,res) => {
-// 	models.User.findOne({where: {username: req.body.username}}).then((user) => {
-// 		res.json(bcrypt.compareSync(req.body.password, user.password_hash));
-// 	});
-// });
-module.exports = (app, passport) => {
-app.get('/api/login', function(req,res){
-		if(req.user){
-			res.json({message: 'signed-in', user_id: req.user.id});
-		}
-	});
-app.post('/api/login', function(req,res,next){
+router.get('/api/login', function(req,res){
+	if(req.user){
+		res.json({message: 'signed-in', user_id: req.user.id});
+	}
+});
+
+router.post('/api/login', function(req,res,next){
 	passport.authenticate('local-signin', function(err, user, info){
 		   if (err) {
 		     return next(err);
@@ -54,7 +76,7 @@ app.post('/api/login', function(req,res,next){
 	  })(req, res, next);
 });
 
-app.get('/api/logged-in', (req,res) => {
+router.get('/api/logged-in', (req,res) => {
 	if(req.user){
 		res.json({message: 'logged-in', user: req.user});
 	} else {
@@ -81,6 +103,5 @@ router.get('/api/dancers', (req,res) => {
 router.get('*', (req,res) => {
 	res.sendFile(path.join(__dirname, '../../client/public/index.html'));
 });
-}
 
 module.exports = router;

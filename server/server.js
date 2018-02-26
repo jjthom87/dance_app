@@ -5,12 +5,13 @@ var bodyParser = require("body-parser");
 var path = require("path");
 
 var passport = require('passport');
+var session = require('express-session');
+var SequelizeStore = require('connect-session-sequelize')(session.Store);
 // Create a new express app
 var app = express();
 // Sets an initial port. We'll use this later in our listener
 var PORT = process.env.PORT || 5000;
 
-//using sequelize for my database connection
 var models = require('./models');
 models.sequelize.sync();
 
@@ -24,11 +25,16 @@ app.use(bodyParser.json({ type: "application/vnd.api+json" }));
 var routes = require('./controller/routes.js');
 app.use('/', routes);
 
+app.use(session({
+	secret: 'lesson',
+	store: new SequelizeStore({
+		db: models.sequelize
+ 	}),
+ 	resave: true,
+ 	saveUninitialized: false
+}));
 app.use(passport.initialize());
 app.use(passport.session());
-
-require('./controller/passport.js')(passport);
-require('./controller/routes.js')(passport);
 
 
 // Starting our express server
